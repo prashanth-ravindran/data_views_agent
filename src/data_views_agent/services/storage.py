@@ -338,7 +338,10 @@ class SQLiteStore:
         with self.connect() as connection:
             return pd.read_sql_query(
                 """
-                SELECT created_at, user_prompt, sql_text, row_count
+                SELECT
+                    created_at AS run_time,
+                    user_prompt AS request,
+                    row_count AS matches
                 FROM query_logs
                 WHERE ingestion_run_id = ?
                 ORDER BY id DESC

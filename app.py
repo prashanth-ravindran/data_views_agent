@@ -19,7 +19,7 @@ from data_views_agent.services.storage import CANONICAL_TABLE, SQLiteStore
 from data_views_agent.services.synthetic_data import dataframe_to_xlsx_bytes, generate_workbook
 
 
-st.set_page_config(page_title="Maharashtra Data Views Agent", layout="wide")
+st.set_page_config(page_title="Maharashtra Registration Insights", layout="wide")
 
 settings = get_settings()
 store = SQLiteStore(settings.database_path)
@@ -33,7 +33,7 @@ def current_profile() -> WorkbookProfile | None:
 
 
 def save_and_ingest(workbook_path: Path) -> None:
-    with st.spinner("Profiling workbook and loading it into SQLite..."):
+    with st.spinner("Preparing workbook for analysis..."):
         profile = ingestor.ingest_workbook(workbook_path)
     st.session_state["current_profile"] = profile
     st.session_state["generated_plan_json"] = ""
@@ -59,7 +59,7 @@ def generate_demo_workbook(rows: int, offices: int, seed: int) -> Path:
 
 
 def render_profile(profile: WorkbookProfile) -> None:
-    st.subheader("Ingestion Summary")
+    st.subheader("Workbook Summary")
     col1, col2, col3 = st.columns(3)
     col1.metric("Workbook", profile.workbook_name)
     col2.metric("Sheets", profile.total_sheets)
@@ -67,10 +67,10 @@ def render_profile(profile: WorkbookProfile) -> None:
 
     profile_rows = [
         {
-            "sheet_name": sheet.sheet_name,
-            "rows": sheet.row_count,
-            "columns": sheet.column_count,
-            "mapped_canonical_fields": ", ".join(sheet.mapped_canonical_fields),
+            "Sheet": sheet.sheet_name,
+            "Rows": sheet.row_count,
+            "Columns": sheet.column_count,
+            "Recognized fields": ", ".join(sheet.mapped_canonical_fields),
         }
         for sheet in profile.sheet_profiles[:50]
     ]
@@ -78,21 +78,22 @@ def render_profile(profile: WorkbookProfile) -> None:
 
 
 def render_plan_summary(plan: QueryPlan) -> None:
-    st.markdown("**Generated Plan**")
+    st.markdown("**Proposed Approach**")
     st.write(f"Goal: {plan.goal}")
-    st.write(f"Execution mode: `{plan.execution_mode}`")
-    st.write(f"Target scope: `{plan.target_scope}`")
-    st.write(f"Target sheets: {', '.join(plan.target_sheets) if plan.target_sheets else 'All applicable sheets'}")
-    st.write(f"Selected columns: {', '.join(plan.selected_columns) if plan.selected_columns else 'Default columns'}")
+    st.write(
+        "Coverage: "
+        + (", ".join(plan.target_sheets) if plan.target_sheets else "Across the relevant workbook tabs")
+    )
+    st.write(
+        "Included columns: "
+        + (", ".join(plan.selected_columns) if plan.selected_columns else "A default result view")
+    )
     if plan.filters:
-        st.write(
-            "Filters: "
-            + "; ".join(f"{flt.field} {flt.operator} {flt.value}" for flt in plan.filters)
-        )
+        st.write("Conditions: " + "; ".join(f"{flt.field} {flt.operator} {flt.value}" for flt in plan.filters))
     if plan.assumptions:
         st.write("Assumptions: " + "; ".join(plan.assumptions))
     if plan.ambiguities:
-        st.write("Ambiguities: " + "; ".join(plan.ambiguities))
+        st.write("Points to confirm: " + "; ".join(plan.ambiguities))
     if plan.explanation:
         st.write(plan.explanation)
 
@@ -105,23 +106,18 @@ def available_columns_for_profile(profile: WorkbookProfile) -> tuple[dict[str, l
     return available, sheet_table_map
 
 
-st.title("Maharashtra Registration Data Views Agent")
-st.caption("Gemini-planned, SQLite-backed filtering for large multi-sheet Excel workbooks.")
+st.title("Maharashtra Registration Insights Demo")
+st.caption("Prompt-driven exploration for large multi-sheet Excel workbooks.")
 
-with st.expander("Environment", expanded=True):
-    col1, col2, col3 = st.columns(3)
-    col1.write(f"Gemini model: `{settings.gemini_model}`")
-    col2.write(f"Gemini configured: `{planner.is_configured}`")
-    col3.write(f"SQLite DB: `{settings.database_path}`")
-    if not planner.is_configured:
-        st.warning("Set `GEMINI_API_KEY` or `GOOGLE_API_KEY` in `.env` before generating plans.")
+if not planner.is_configured:
+    st.warning("Add the required access key in `.env` before generating proposals.")
 
-st.subheader("Data Input")
+st.subheader("Choose Data")
 upload_col, demo_col = st.columns(2)
 
 with upload_col:
     uploaded_file = st.file_uploader("Upload an Excel workbook", type=["xlsx", "xlsm"])
-    if uploaded_file and st.button("Ingest Uploaded Workbook", use_container_width=True):
+    if uploaded_file and st.button("Load Uploaded Workbook", use_container_width=True):
         upload_path = settings.uploads_dir / f"{datetime.now(UTC).strftime('%Y%m%d_%H%M%S')}_{uploaded_file.name}"
         upload_path.write_bytes(uploaded_file.getvalue())
         save_and_ingest(upload_path)
@@ -130,7 +126,7 @@ with demo_col:
     demo_rows = st.number_input("Demo rows", min_value=1000, max_value=100000, value=15000, step=1000)
     demo_offices = st.number_input("Demo office sheets", min_value=5, max_value=100, value=25, step=5)
     demo_seed = st.number_input("Random seed", min_value=1, max_value=9999, value=7, step=1)
-    if st.button("Generate And Ingest Demo Workbook", use_container_width=True):
+    if st.button("Create Demo Workbook", use_container_width=True):
         workbook_path = generate_demo_workbook(demo_rows, demo_offices, demo_seed)
         save_and_ingest(workbook_path)
 
@@ -138,14 +134,14 @@ profile = current_profile()
 if profile:
     render_profile(profile)
 
-    st.subheader("Prompt To Plan")
+    st.subheader("Ask A Question")
     prompt = st.text_area(
         "Describe the data subset you want",
         value=st.session_state.get("last_prompt", ""),
         height=140,
         placeholder="Example: Show registrations from Pune district after 2024-01-01 where market value is above 1 crore and property type is Flat.",
     )
-    if st.button("Generate Plan", disabled=not planner.is_configured or not prompt.strip()):
+    if st.button("Generate Proposal", disabled=not planner.is_configured or not prompt.strip()):
         plan = planner.generate_plan(prompt.strip(), profile.ingestion_run_id, store)
         st.session_state["last_prompt"] = prompt.strip()
         st.session_state["generated_plan_json"] = plan.model_dump_json(indent=2)
@@ -154,9 +150,10 @@ if profile:
     if st.session_state.get("generated_plan_json"):
         generated_plan = QueryPlan.model_validate_json(st.session_state["generated_plan_json"])
         render_plan_summary(generated_plan)
-        st.text_area("Editable approved plan JSON", key="approved_plan_json", height=320)
+        with st.expander("Advanced Review", expanded=False):
+            st.text_area("Proposal details", key="approved_plan_json", height=320)
 
-        if st.button("Approve And Run Query", use_container_width=True):
+        if st.button("Approve And Show Results", use_container_width=True):
             try:
                 approved_plan = QueryPlan.model_validate_json(st.session_state["approved_plan_json"])
                 available_columns, sheet_table_map = available_columns_for_profile(profile)
@@ -176,9 +173,7 @@ if profile:
                     built_query.sql_params,
                     row_count,
                 )
-                st.success(f"Query returned {row_count} rows.")
-                st.code(built_query.sql_text, language="sql")
-                st.write({"sql_params": built_query.sql_params})
+                st.success(f"Results ready: {row_count} matching rows found.")
                 st.dataframe(result_df, use_container_width=True, hide_index=True)
                 st.download_button(
                     "Download CSV",
@@ -193,9 +188,9 @@ if profile:
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 )
             except (SQLBuildError, ValueError) as exc:
-                st.error(str(exc))
+                st.error("The results could not be prepared from the current proposal. Please refine the request or review the advanced details.")
 
         history = store.fetch_recent_query_logs(profile.ingestion_run_id, limit=10)
         if not history.empty:
-            st.subheader("Execution History")
+            st.subheader("Recent Runs")
             st.dataframe(history, use_container_width=True, hide_index=True)

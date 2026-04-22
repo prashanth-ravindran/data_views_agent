@@ -1,6 +1,6 @@
 # Data Views Agent
 
-Streamlit demo for querying large multi-sheet Excel workbooks with a Gemini-driven planning step and SQLite-backed filtering.
+Streamlit demo for exploring large multi-sheet Excel workbooks with an AI-assisted planning step and fast local filtering.
 
 ## Local setup
 ```bash

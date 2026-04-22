@@ -34,7 +34,9 @@ class Settings(BaseModel):
         REPO_ROOT / "src" / "data_views_agent" / "data" / "maharashtra_registration_offices.json"
     )
     gemini_api_key: str | None = Field(
-        default_factory=lambda: os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
+        default_factory=lambda: os.getenv("AI_API_KEY")
+        or os.getenv("GEMINI_API_KEY")
+        or os.getenv("GOOGLE_API_KEY")
     )
     gemini_model: str = Field(
         default_factory=lambda: resolve_gemini_model_name(
