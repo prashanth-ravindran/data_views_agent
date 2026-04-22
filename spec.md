@@ -4,6 +4,8 @@
 - Implementation started on 2026-04-22.
 - This repo uses a local `.venv` created with Python 3.12 because `python3.11` is not installed on this machine.
 - The LLM backend is Gemini Flash, not OpenAI.
+- The runtime reads `LLM_MODEL` from `.env`, with `GEMINI_MODEL` retained as a compatibility fallback.
+- The runtime accepts `LLM_MODEL=gemini-3.1-flash` as a local alias and resolves it to the closest live Gemini `generateContent` model currently exposed by the API: `models/gemini-3-flash-preview`.
 
 ## Scope
 - Build a Streamlit demo that ingests a large Excel workbook with many sheets, profiles the sheets, normalizes usable fields into SQLite, generates an LLM-driven query plan, allows manual approval/editing of that plan, and returns the filtered dataset.
@@ -11,7 +13,7 @@
 - Keep a data-driven office manifest rather than hardcoding office counts or names inside generator code.
 
 ## Current Decisions
-- Default Gemini model: `gemini-2.5-flash`.
+- Default Gemini model: `gemini-3.1-flash`.
 - Query planning format: structured JSON output from Gemini using the official `google-genai` Python SDK.
 - SQL generation: deterministic application code, not model-emitted SQL.
 - Storage: SQLite with raw sheet tables, canonical normalized table, ingestion metadata tables, and execution log tables.
