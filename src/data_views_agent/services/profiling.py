@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from collections import defaultdict
+import json
+import logging
 from typing import Any
 
 import pandas as pd
@@ -119,6 +121,30 @@ AREA_FACTORS = {
     "sqm": 10.7639,
     "square_meter": 10.7639,
     "sq_yd": 9.0,
+}
+
+logger = logging.getLogger(__name__)
+
+GEMINI_SCHEMA_MAPPING_RESPONSE_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "suggestions": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "source_column": {"type": "string"},
+                    "canonical_field": {"type": ["string", "null"]},
+                    "confidence": {"type": "number", "minimum": 0, "maximum": 1},
+                    "reasoning": {"type": "string"},
+                },
+                "required": ["source_column", "canonical_field", "confidence", "reasoning"],
+                "additionalProperties": False,
+            },
+        }
+    },
+    "required": ["suggestions"],
+    "additionalProperties": False,
 }
 
 
@@ -273,22 +299,26 @@ class GeminiSchemaMapper:
             f"Columns: {payload}"
         )
 
-        response = self.client.models.generate_content(
-            model=self.model_name,
-            contents=prompt,
-            config=types.GenerateContentConfig(
-                system_instruction=(
-                    "You are a schema-mapping assistant for Maharashtra property registration workbooks. "
-                    "Only map a column when the semantic match is strong. Prefer null over guessing."
+        try:
+            response = self.client.models.generate_content(
+                model=self.model_name,
+                contents=prompt,
+                config=types.GenerateContentConfig(
+                    system_instruction=(
+                        "You are a schema-mapping assistant for Maharashtra property registration workbooks. "
+                        "Only map a column when the semantic match is strong. Prefer null over guessing."
+                    ),
+                    temperature=0,
+                    response_mime_type="application/json",
+                    response_json_schema=GEMINI_SCHEMA_MAPPING_RESPONSE_SCHEMA,
                 ),
-                temperature=0,
-                response_mime_type="application/json",
-                response_schema=SchemaMappingResponse,
-            ),
-        )
+            )
+            parsed = SchemaMappingResponse.model_validate(json.loads(response.text))
+            suggestions = parsed.suggestions
+        except Exception:
+            logger.exception("Gemini schema mapping failed for sheet '%s'. Falling back to heuristic mapping only.", sheet_name)
+            return []
 
-        parsed = response.parsed or SchemaMappingResponse.model_validate_json(response.text)
-        suggestions = parsed.suggestions if isinstance(parsed, SchemaMappingResponse) else parsed.suggestions
         return [
             MappingDecision(
                 canonical_field=suggestion.canonical_field,
@@ -368,4 +398,3 @@ def best_mapping_by_canonical(profile: SheetProfile) -> dict[str, MappingDecisio
         if existing is None or decision.confidence > existing.confidence:
             best[decision.canonical_field] = decision
     return best
-

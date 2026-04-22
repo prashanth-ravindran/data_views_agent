@@ -15,6 +15,7 @@
 ## Current Decisions
 - Default Gemini model: `gemini-3.1-flash`.
 - Query planning format: structured JSON output from Gemini using the official `google-genai` Python SDK.
+- Gemini structured output is implemented with explicit `response_json_schema` payloads rather than SDK `response_schema` model binding, because that path was rejected by the live API for nested objects during ingestion-time schema mapping.
 - SQL generation: deterministic application code, not model-emitted SQL.
 - Storage: SQLite with raw sheet tables, canonical normalized table, ingestion metadata tables, and execution log tables.
 - Approval flow: user edits/approves the generated plan in the Streamlit UI before query execution.
